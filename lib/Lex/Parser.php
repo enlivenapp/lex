@@ -45,6 +45,7 @@ class Parser {
      */
     public function parse($template, $data = array(), $callback = false, $allowPhp = false) {
 
+        // check wheter the template exists
         if (!file_exists($template))
             return trigger_error("Template doesn't exists");
 
