@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Part of the Lex Template Parser.
  *
@@ -9,34 +10,27 @@
 
 namespace Lex;
 
-class Parser
-{
+class Parser {
+
     protected $allowPhp = false;
     protected $regexSetup = false;
     protected $scopeGlue = '.';
     protected $tagRegex = '';
     protected $cumulativeNoparse = false;
-
     protected $inCondition = false;
-
     protected $variableRegex = '';
     protected $variableLoopRegex = '';
     protected $variableTagRegex = '';
-
     protected $callbackTagRegex = '';
     protected $callbackLoopTagRegex = '';
-
     protected $noparseRegex = '';
-
     protected $conditionalRegex = '';
     protected $conditionalElseRegex = '';
     protected $conditionalEndRegex = '';
     protected $conditionalData = array();
-
     protected static $extractions = array(
         'noparse' => array(),
     );
-
     protected static $data = null;
     protected static $callbackData = array();
 
@@ -44,22 +38,26 @@ class Parser
      * The main Lex parser method.  Essentially acts as dispatcher to
      * all of the helper parser methods.
      *
-     * @param  string       $text     Text to parse
+     * @param  string       $template     template to parse
      * @param  array|object $data     Array or object to use
      * @param  mixed        $callback Callback to use for Callback Tags
      * @return string
      */
-    public function parse($text, $data = array(), $callback = false, $allowPhp = false)
-    {
+    public function parse($template, $data = array(), $callback = false, $allowPhp = false) {
+
+        if (!file_exists($template))
+            return trigger_error("Template doesn't exists");
+
+        $text = file_get_contents($template);
 
         $this->setupRegex();
         $this->allowPhp = $allowPhp;
-        
+
         // Only convert objects to arrays
         if (is_object($data)) {
-            $data = $this->toArray($data);    
+            $data = $this->toArray($data);
         }
-        
+
         // Is this the first time parse() is called?
         if (self::$data === null) {
             // Let's store the local data array for later use.
@@ -76,7 +74,7 @@ class Parser
         }
 
         // The parseConditionals method executes any PHP in the text, so clean it up.
-        if (! $allowPhp) {
+        if (!$allowPhp) {
             $text = str_replace(array('<?', '?>'), array('&lt;?', '?&gt;'), $text);
         }
 
@@ -98,7 +96,7 @@ class Parser
         // To ensure that {{ noparse }} is never parsed even during consecutive parse calls
         // set $cumulativeNoparse to true and use self::injectNoparse($text); immediately
         // before the final output is sent to the browser
-        if (! $this->cumulativeNoparse) {
+        if (!$this->cumulativeNoparse) {
             $text = $this->injectExtractions($text);
         }
 
@@ -111,8 +109,7 @@ class Parser
      * @param  string $text Text to remove comments from
      * @return string
      */
-    public function parseComments($text)
-    {
+    public function parseComments($text) {
         $this->setupRegex();
 
         return preg_replace('/\{\{#.*?#\}\}/s', '', $text);
@@ -126,8 +123,7 @@ class Parser
      * @param  array|object $data Array or object to use
      * @return string
      */
-    public function parseVariables($text, $data, $callback = null)
-    {
+    public function parseVariables($text, $data, $callback = null) {
         $this->setupRegex();
 
         /**
@@ -142,7 +138,7 @@ class Parser
             foreach ($data_matches as $index => $match) {
                 if ($loop_data = $this->getVariable($match[1][0], $data)) {
                     $looped_text = '';
-                    if (is_array($loop_data) or ($loop_data instanceof \IteratorAggregate)) {
+                    if (is_array($loop_data) or ( $loop_data instanceof \IteratorAggregate)) {
                         foreach ($loop_data as $item_data) {
                             $str = $this->extractLoopedTags($match[2][0], $item_data, $callback);
                             $str = $this->parseConditionals($str, $item_data, $callback);
@@ -153,9 +149,9 @@ class Parser
                             }
 
                             $looped_text .= $str;
-                        }                        
+                        }
                     }
-                    $text = preg_replace('/'.preg_quote($match[0][0], '/').'/m', addcslashes($looped_text, '\\$'), $text, 1);
+                    $text = preg_replace('/' . preg_quote($match[0][0], '/') . '/m', addcslashes($looped_text, '\\$'), $text, 1);
                 } else { // It's a callback block.
                     // Let's extract it so it doesn't conflict
                     // with the local scope variables in the next step.
@@ -187,15 +183,14 @@ class Parser
      * @param  bool   $inConditional Whether we are in a conditional tag
      * @return string
      */
-    public function parseCallbackTags($text, $data, $callback)
-    {
+    public function parseCallbackTags($text, $data, $callback) {
         $this->setupRegex();
         $inCondition = $this->inCondition;
 
         if ($inCondition) {
-            $regex = '/\{\s*('.$this->variableRegex.')(\s+.*?)?\s*\}/ms';
+            $regex = '/\{\s*(' . $this->variableRegex . ')(\s+.*?)?\s*\}/ms';
         } else {
-            $regex = '/\{\{\s*('.$this->variableRegex.')(\s+.*?)?\s*(\/)?\}\}/ms';
+            $regex = '/\{\{\s*(' . $this->variableRegex . ')(\s+.*?)?\s*(\/)?\}\}/ms';
         }
         /**
          * $match[0][0] is the raw tag
@@ -215,7 +210,7 @@ class Parser
             $name = $match[1][0];
             if (isset($match[2])) {
                 $cb_data = $data;
-                if ( !empty(self::$callbackData)) {
+                if (!empty(self::$callbackData)) {
                     $data = $this->toArray($data);
                     $cb_data = array_merge(self::$callbackData, $data);
                 }
@@ -229,15 +224,15 @@ class Parser
             $content = '';
 
             $temp_text = substr($text, $start + strlen($tag));
-            if (preg_match('/\{\{\s*\/'.preg_quote($name, '/').'\s*\}\}/m', $temp_text, $match, PREG_OFFSET_CAPTURE) && ! $selfClosed) {
+            if (preg_match('/\{\{\s*\/' . preg_quote($name, '/') . '\s*\}\}/m', $temp_text, $match, PREG_OFFSET_CAPTURE) && !$selfClosed) {
 
                 $content = substr($temp_text, 0, $match[0][1]);
-                $tag .= $content.$match[0][0];
+                $tag .= $content . $match[0][0];
 
                 // Is there a nested block under this one existing with the same name?
-                $nested_regex = '/\{\{\s*('.preg_quote($name, '/').')(\s.*?)\}\}(.*?)\{\{\s*\/\1\s*\}\}/ms';
-                if (preg_match($nested_regex, $content.$match[0][0], $nested_matches)) {
-                    $nested_content = preg_replace('/\{\{\s*\/'.preg_quote($name, '/').'\s*\}\}/m', '', $nested_matches[0]);
+                $nested_regex = '/\{\{\s*(' . preg_quote($name, '/') . ')(\s.*?)\}\}(.*?)\{\{\s*\/\1\s*\}\}/ms';
+                if (preg_match($nested_regex, $content . $match[0][0], $nested_matches)) {
+                    $nested_content = preg_replace('/\{\{\s*\/' . preg_quote($name, '/') . '\s*\}\}/m', '', $nested_matches[0]);
                     $content = $this->createExtraction('nested_looped_tags', $nested_content, $nested_content, $content);
                 }
             }
@@ -248,7 +243,7 @@ class Parser
             if ($inCondition) {
                 $replacement = $this->valueToLiteral($replacement);
             }
-            $text = preg_replace('/'.preg_quote($tag, '/').'/m', addcslashes($replacement, '\\$'), $text, 1);
+            $text = preg_replace('/' . preg_quote($tag, '/') . '/m', addcslashes($replacement, '\\$'), $text, 1);
             $text = $this->injectExtractions($text, 'nested_looped_tags');
         }
 
@@ -263,8 +258,7 @@ class Parser
      * @param  mixed  $callback The callback to be used for tags
      * @return string
      */
-    public function parseConditionals($text, $data, $callback)
-    {
+    public function parseConditionals($text, $data, $callback) {
         $this->setupRegex();
         preg_match_all($this->conditionalRegex, $text, $matches, PREG_SET_ORDER);
 
@@ -294,14 +288,14 @@ class Parser
                     if ($this->getVariable($m[2], $data, '__doesnt_exist__') === '__doesnt_exist__') {
                         $exists = 'false';
                     }
-                    $condition = $this->createExtraction('__cond_exists', $m[0], $m[1].$exists.$m[3], $condition);
+                    $condition = $this->createExtraction('__cond_exists', $m[0], $m[1] . $exists . $m[3], $condition);
                 }
             }
 
-            $condition = preg_replace_callback('/\b('.$this->variableRegex.')\b/', array($this, 'processConditionVar'), $condition);
+            $condition = preg_replace_callback('/\b(' . $this->variableRegex . ')\b/', array($this, 'processConditionVar'), $condition);
 
             if ($callback) {
-                $condition = preg_replace('/\b(?!\{\s*)('.$this->callbackNameRegex.')(?!\s+.*?\s*\})\b/', '{$1}', $condition);
+                $condition = preg_replace('/\b(?!\{\s*)(' . $this->callbackNameRegex . ')(?!\s+.*?\s*\})\b/', '{$1}', $condition);
                 $condition = $this->parseCallbackTags($condition, $data, $callback);
             }
 
@@ -315,7 +309,7 @@ class Parser
 
             // Re-process for variables, we trick processConditionVar so that it will return null
             $this->inCondition = false;
-            $condition = preg_replace_callback('/\b('.$this->variableRegex.')\b/', array($this, 'processConditionVar'), $condition);
+            $condition = preg_replace_callback('/\b(' . $this->variableRegex . ')\b/', array($this, 'processConditionVar'), $condition);
             $this->inCondition = true;
 
             // Re-inject any strings we extracted
@@ -325,16 +319,16 @@ class Parser
             $conditional = '<?php ';
 
             if ($match[1] == 'unless') {
-                $conditional .= 'if ( ! ('.$condition.'))';
+                $conditional .= 'if ( ! (' . $condition . '))';
             } elseif ($match[1] == 'elseunless') {
-                $conditional .= 'elseif ( ! ('.$condition.'))';
+                $conditional .= 'elseif ( ! (' . $condition . '))';
             } else {
-                $conditional .= $match[1].' ('.$condition.')';
+                $conditional .= $match[1] . ' (' . $condition . ')';
             }
 
             $conditional .= ': ?>';
 
-            $text = preg_replace('/'.preg_quote($match[0], '/').'/m', addcslashes($conditional, '\\$'), $text, 1);
+            $text = preg_replace('/' . preg_quote($match[0], '/') . '/m', addcslashes($conditional, '\\$'), $text, 1);
         }
 
         $text = preg_replace($this->conditionalElseRegex, '<?php else: ?>', $text);
@@ -354,8 +348,7 @@ class Parser
      * @param  mixed  $callback
      * @return string $text
      */
-    public function parseRecursives($text, $orig_text, $callback)
-    {
+    public function parseRecursives($text, $orig_text, $callback) {
         // Is there a {{ *recursive [array_key]* }} tag here, let's loop through it.
         if (preg_match($this->recursiveRegex, $text, $match)) {
             $array_key = $match[1];
@@ -379,7 +372,7 @@ class Parser
 
                 // Does this child not contain any children?
                 // Let's set it as empty then to avoid any errors.
-                if ( ! array_key_exists($array_key, $child)) {
+                if (!array_key_exists($array_key, $child)) {
                     $child[$array_key] = array();
                     $has_children = false;
                 }
@@ -392,9 +385,9 @@ class Parser
 
                 // If this is the last loop set the next tag to be empty
                 // otherwise hash it.
-                $next_tag = ($count == $child_count) ? '' : md5($tag.$replacement);
+                $next_tag = ($count == $child_count) ? '' : md5($tag . $replacement);
 
-                $text = str_replace($current_tag, $replacement.$next_tag, $text);
+                $text = str_replace($current_tag, $replacement . $next_tag, $text);
 
                 if ($has_children) {
                     $text = $this->parseRecursives($text, $orig_text, $callback);
@@ -412,8 +405,7 @@ class Parser
      * @param  string|null $glue The Scope Glue
      * @return string
      */
-    public function scopeGlue($glue = null)
-    {
+    public function scopeGlue($glue = null) {
         if ($glue !== null) {
             $this->regexSetup = false;
             $this->scopeGlue = $glue;
@@ -428,8 +420,7 @@ class Parser
      * @param  bool $mode
      * @return void
      */
-    public function cumulativeNoparse($mode)
-    {
+    public function cumulativeNoparse($mode) {
         $this->cumulativeNoparse = $mode;
     }
 
@@ -443,8 +434,7 @@ class Parser
      * @param  string $text Text to inject into
      * @return string
      */
-    public static function injectNoparse($text)
-    {
+    public static function injectNoparse($text) {
         if (isset(self::$extractions['noparse'])) {
             foreach (self::$extractions['noparse'] AS $hash => $replacement) {
                 if (strpos($text, "noparse_{$hash}") !== FALSE) {
@@ -463,14 +453,12 @@ class Parser
      * @param  array  $match A match from preg_replace_callback
      * @return string
      */
-    protected function processConditionVar($match)
-    {
+    protected function processConditionVar($match) {
         $var = is_array($match) ? $match[0] : $match;
         if (in_array(strtolower($var), array('true', 'false', 'null', 'or', 'and')) or
-            strpos($var, '__cond_str') === 0 or
-            strpos($var, '__cond_exists') === 0 or
-            is_numeric($var))
-        {
+                strpos($var, '__cond_str') === 0 or
+                strpos($var, '__cond_exists') === 0 or
+                is_numeric($var)) {
             return $var;
         }
 
@@ -490,9 +478,8 @@ class Parser
      * @param  array  $match A match from preg_replace_callback
      * @return string
      */
-    protected function processParamVar($match)
-    {
-        return $match[1].$this->processConditionVar($match[2]);
+    protected function processParamVar($match) {
+        return $match[1] . $this->processConditionVar($match[2]);
     }
 
     /**
@@ -501,8 +488,7 @@ class Parser
      * @param  string $value Value to convert
      * @return string
      */
-    protected function valueToLiteral($value)
-    {
+    protected function valueToLiteral($value) {
         if (is_object($value) and is_callable(array($value, '__toString'))) {
             return var_export((string) $value, true);
         } elseif (is_array($value)) {
@@ -517,28 +503,27 @@ class Parser
      *
      * @return void
      */
-    protected function setupRegex()
-    {
+    protected function setupRegex() {
         if ($this->regexSetup) {
             return;
         }
         $glue = preg_quote($this->scopeGlue, '/');
 
-        $this->variableRegex = $glue === '\\.' ? '[a-zA-Z0-9_'.$glue.']+' : '[a-zA-Z0-9_\.'.$glue.']+';
-        $this->callbackNameRegex = $this->variableRegex.$glue.$this->variableRegex;
-        $this->variableLoopRegex = '/\{\{\s*('.$this->variableRegex.')\s*\}\}(.*?)\{\{\s*\/\1\s*\}\}/ms';
-        $this->variableTagRegex = '/\{\{\s*('.$this->variableRegex.')\s*\}\}/m';
+        $this->variableRegex = $glue === '\\.' ? '[a-zA-Z0-9_' . $glue . ']+' : '[a-zA-Z0-9_\.' . $glue . ']+';
+        $this->callbackNameRegex = $this->variableRegex . $glue . $this->variableRegex;
+        $this->variableLoopRegex = '/\{\{\s*(' . $this->variableRegex . ')\s*\}\}(.*?)\{\{\s*\/\1\s*\}\}/ms';
+        $this->variableTagRegex = '/\{\{\s*(' . $this->variableRegex . ')\s*\}\}/m';
 
-        $this->callbackBlockRegex = '/\{\{\s*('.$this->variableRegex.')(\s.*?)\}\}(.*?)\{\{\s*\/\1\s*\}\}/ms';
+        $this->callbackBlockRegex = '/\{\{\s*(' . $this->variableRegex . ')(\s.*?)\}\}(.*?)\{\{\s*\/\1\s*\}\}/ms';
 
-        $this->recursiveRegex = '/\{\{\s*\*recursive\s*('.$this->variableRegex.')\*\s*\}\}/ms';
+        $this->recursiveRegex = '/\{\{\s*\*recursive\s*(' . $this->variableRegex . ')\*\s*\}\}/ms';
 
         $this->noparseRegex = '/\{\{\s*noparse\s*\}\}(.*?)\{\{\s*\/noparse\s*\}\}/ms';
 
         $this->conditionalRegex = '/\{\{\s*(if|unless|elseif|elseunless)\s*((?:\()?(.*?)(?:\))?)\s*\}\}/ms';
         $this->conditionalElseRegex = '/\{\{\s*else\s*\}\}/ms';
         $this->conditionalEndRegex = '/\{\{\s*endif\s*\}\}/ms';
-        $this->conditionalExistsRegex = '/(\s+|^)exists\s+('.$this->variableRegex.')(\s+|$)/ms';
+        $this->conditionalExistsRegex = '/(\s+|^)exists\s+(' . $this->variableRegex . ')(\s+|$)/ms';
         $this->conditionalNotRegex = '/(\s+|^)not(\s+|$)/ms';
 
         $this->regexSetup = true;
@@ -554,8 +539,7 @@ class Parser
      * @param  string $text The text to extract from
      * @return string
      */
-    protected function extractNoparse($text)
-    {
+    protected function extractNoparse($text) {
         /**
          * $matches[][0] is the raw noparse match
          * $matches[][1] is the noparse contents
@@ -575,8 +559,7 @@ class Parser
      * @param  string $text The text to extract from
      * @return string
      */
-    protected function extractLoopedTags($text, $data = array(), $callback = null)
-    {
+    protected function extractLoopedTags($text, $data = array(), $callback = null) {
         /**
          * $matches[][0] is the raw match
          */
@@ -606,8 +589,7 @@ class Parser
      * @param  string $text        Text to extract out of
      * @return string
      */
-    protected function createExtraction($type, $extraction, $replacement, $text)
-    {
+    protected function createExtraction($type, $extraction, $replacement, $text) {
         $hash = md5($replacement);
         self::$extractions[$type][$hash] = $replacement;
 
@@ -620,8 +602,7 @@ class Parser
      * @param  string $text Text to inject into
      * @return string
      */
-    protected function injectExtractions($text, $type = null)
-    {
+    protected function injectExtractions($text, $type = null) {
         if ($type === null) {
             foreach (self::$extractions as $type => $extractions) {
                 foreach ($extractions as $hash => $replacement) {
@@ -632,7 +613,7 @@ class Parser
                 }
             }
         } else {
-            if ( ! isset(self::$extractions[$type])) {
+            if (!isset(self::$extractions[$type])) {
                 return $text;
             }
 
@@ -656,8 +637,7 @@ class Parser
      * @param  mixed        $default Default value to use if not found
      * @return mixed
      */
-    protected function getVariable($key, $data, $default = null)
-    {
+    protected function getVariable($key, $data, $default = null) {
         if (strpos($key, $this->scopeGlue) === false) {
             $parts = explode('.', $key);
         } else {
@@ -665,13 +645,13 @@ class Parser
         }
         foreach ($parts as $key_part) {
             if (is_array($data)) {
-                if ( ! array_key_exists($key_part, $data)) {
+                if (!array_key_exists($key_part, $data)) {
                     return $default;
                 }
 
                 $data = $data[$key_part];
             } elseif (is_object($data)) {
-                if ( ! isset($data->{$key_part})) {
+                if (!isset($data->{$key_part})) {
                     return $default;
                 }
 
@@ -690,19 +670,17 @@ class Parser
      * @param  string $text Text to evaluate
      * @return string
      */
-    protected function parsePhp($text)
-    {
+    protected function parsePhp($text) {
         ob_start();
-        $result = eval('?>'.$text.'<?php ');
+        $result = eval('?>' . $text . '<?php ');
 
         if ($result === false) {
             $output = 'You have a syntax error in your Lex tags. The offending code: ';
-            throw new ParsingException($output.str_replace(array('?>', '<?php '), '', $text));
+            throw new ParsingException($output . str_replace(array('?>', '<?php '), '', $text));
         }
 
         return ob_get_clean();
     }
-
 
     /**
      * Parses a parameter string into an array
@@ -710,8 +688,7 @@ class Parser
      * @param   string  The string of parameters
      * @return array
      */
-    protected function parseParameters($parameters, $data, $callback)
-    {
+    protected function parseParameters($parameters, $data, $callback) {
         $this->conditionalData = $data;
         $this->inCondition = true;
         // Extract all literal string in the conditional to make it easier
@@ -722,12 +699,10 @@ class Parser
         }
 
         $parameters = preg_replace_callback(
-            '/(.*?\s*=\s*(?!__))('.$this->variableRegex.')/is',
-            array($this, 'processParamVar'),
-            $parameters
+                '/(.*?\s*=\s*(?!__))(' . $this->variableRegex . ')/is', array($this, 'processParamVar'), $parameters
         );
         if ($callback) {
-            $parameters = preg_replace('/(.*?\s*=\s*(?!\{\s*)(?!__))('.$this->callbackNameRegex.')(?!\s*\})\b/', '$1{$2}', $parameters);
+            $parameters = preg_replace('/(.*?\s*=\s*(?!\{\s*)(?!__))(' . $this->callbackNameRegex . ')(?!\s*\})\b/', '$1{$2}', $parameters);
             $parameters = $this->parseCallbackTags($parameters, $data, $callback);
         }
 
@@ -752,9 +727,8 @@ class Parser
      * 
      * @param mixed $data
      * @return array
-     */ 
-    public function toArray($data = array())
-    {
+     */
+    public function toArray($data = array()) {
         if ($data instanceof ArrayableInterface) {
             $data = $data->toArray();
         }
@@ -769,4 +743,5 @@ class Parser
 
         return $data;
     }
+
 }
